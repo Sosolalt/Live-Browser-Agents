@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gemini Runtime</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; width: 320px; }
+      main { padding: 12px; display: grid; gap: 8px; }
+      button { height: 32px; }
+      textarea { width: 100%; min-height: 72px; resize: vertical; }
+      .meta { font-size: 12px; color: #555; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <strong>Gemini Runtime (Skeleton)</strong>
+      <div id="connectionState" class="meta">state: idle</div>
+      <label><input id="micToggle" type="checkbox" /> Mic active</label>
+      <textarea id="transcriptInput" placeholder="Transcript placeholder"></textarea>
+      <input id="actionSelectorInput" type="text" placeholder="Safe selector (e.g. #submit)" />
+      <button id="startButton" type="button">Start session</button>
+      <button id="stopButton" type="button">Stop session</button>
+      <button id="sendButton" type="button">Send transcript</button>
+      <button id="snapshotButton" type="button">Capture DOM snapshot</button>
+      <button id="clickButton" type="button">Execute safe click</button>
+      <button id="cancelActionButton" type="button">Cancel last action</button>
+      <pre id="statusOutput" class="meta"></pre>
+    </main>
+    <script type="module" src="/src/popup/index.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Live Runtime",
+  "description": "MV3 Gemini Live extension with secure session orchestration.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Gemini Runtime",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background/index.js",
+    "type": "module"
+  },
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": [],
+  "content_scripts": [],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; connect-src https://token-service.example.com https://generativelanguage.googleapis.com;"
+  },
+  "minimum_chrome_version": "120"
+}
