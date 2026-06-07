@@ -6,6 +6,99 @@ Production-oriented monorepo scaffold for:
 - a TypeScript backend token service
 - a LangGraph-based multi-agent orchestrator (backend) using LangChain primitives for tools, prompts, memory, and guardrails
 
+## Architecture
+
+Solid lines/boxes are implemented; the dashed, greyed-out block is the **Phase 7/8 roadmap (0% implemented)**. The numbers ①→⑦ trace the runtime sequence.
+
+```mermaid
+flowchart TB
+    User([User<br/>voice + browsing])
+
+    subgraph BROWSER["Chrome browser — MV3 extension (TypeScript · Vite, 0 runtime deps)"]
+        direction TB
+        subgraph POPUP["popup/"]
+            P1["index.ts<br/>mic capture · UI · observability"]
+        end
+        subgraph CONTENT["content/ (content script)"]
+            C2["snapshot.ts<br/>DOM snapshot · redaction · scoring"]
+            C1["index.ts<br/>action executor (click/fill/nav)"]
+        end
+        subgraph BG["background/ (service worker)"]
+            B1["index.ts — message router"]
+            B2["orchestrator.ts<br/>lifecycle · dispatch queue"]
+            B3["transport.ts<br/>WebSocket · reconnect · replay"]
+            B5["token.ts<br/>ECDSA keypair · installId"]
+            B6["policy.ts — guardrails · blocked domains"]
+            B7["storage.ts — resumption · replay buffer"]
+            B8["audio.ts — encode/normalise"]
+            B4["session.ts"]
+        end
+        SHARED["shared/ · schema.ts · contracts.ts (Zod) · audioCodec.ts"]
+    end
+
+    subgraph BACKEND["Backend — Node 20 · Express · Zod"]
+        direction TB
+        BE1["app.ts / server.ts"]
+        BE2["sessionInit.ts<br/>POST /api/session-init · /api/install/register<br/>ECDSA verify · nonce · rate-limit · kill-switch"]
+        BE3["config.ts · logger.ts<br/>audit log (hashed identity)"]
+    end
+
+    GEMINI["Gemini Live API<br/>bidi audio + function calling"]
+
+    subgraph PLANNED["PLANNED — Phase 7/8 (0% implemented)"]
+        direction TB
+        subgraph LG["LangGraph orchestrator (backend) — shared typed state"]
+            A1{{"Planner<br/>(supervisor)"}}
+            A2["Perception"]
+            A8["Researcher (RAG)"]
+            A3["Navigator"]
+            A4["Form"]
+            A5["Extractor"]
+            A6["Verifier"]
+            A7["Critic / guardrail"]
+            A9["Memory"]
+        end
+        subgraph KG["User Knowledge Graph"]
+            DB1[("Postgres + pgvector<br/>+ Apache AGE + JSONB")]
+            DB2[("Redis (hot cache)")]
+        end
+    end
+
+    %% --- Implemented runtime flow (sequence ①→⑦) ---
+    User -->|"① voice"| P1
+    P1 -->|"② audio chunks"| B8 --> B2 --> B3
+    B5 -->|"③ signed install identity"| BE2
+    BE2 -->|"④ signed session config<br/>model·voice·guardrails·WS url"| B2
+    B3 <-->|"⑤ WebSocket: bidi audio + tool turns"| GEMINI
+    C2 -->|"⑥ DOM snapshot"| B1 --> B2 -->|context| B3
+    GEMINI -->|"⑦ tool calls"| B2 -->|dispatch| C1
+    B6 -. guards .- B2
+    B7 -. persists .- B3
+    B1 <--> P1
+    BE3 -. audit .- BE2
+
+    %% --- Planned: LangGraph composition ---
+    GEMINI -. text + tool turns .-> A1
+    A1 ==>|parallel fan-out| A2 & A8
+    A2 -. join .-> A1
+    A8 -. join .-> A1
+    A1 --> A3 & A4 & A5
+    A3 & A4 & A5 --> A6
+    A6 -->|"verifier fail → replan"| A1
+    A6 --> A7
+    A7 -->|"critic reject → reroute"| A1
+    A4 -. "parser fail → reflect+retry" .-> A4
+    A7 & A6 -. "quorum (Planner+Critic+Verifier)<br/>risky actions" .- A1
+    A8 -. retriever (vector + k-hop graph) .-> DB1
+    A2 & A3 & A4 & A5 & A6 & A7 -. MemoryEvent .-> A9
+    A9 -. read/write .-> DB1
+    A9 -. cache .- DB2
+    BE2 -. "future: checkpoint store (installId+sessionId)" .-> DB2
+
+    classDef planned stroke-dasharray:5 5,fill:#f6f6f6,color:#888,stroke:#bbb;
+    class PLANNED,LG,KG,A1,A2,A3,A4,A5,A6,A7,A8,A9,DB1,DB2 planned;
+```
+
 ## Project goals
 
 1. Ship a hardened MV3 Chrome extension that connects the browser to Gemini Live (realtime voice + tool-use).
