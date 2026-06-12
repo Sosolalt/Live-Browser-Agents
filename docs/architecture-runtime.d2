@@ -1,0 +1,29 @@
+# Runtime flow (①→⑦) — Live Nano Browser
+# Compile:  d2 --theme 0 docs/architecture-runtime.d2 docs/architecture-runtime.svg
+
+shape: sequence_diagram
+
+U: User { shape: person; style: { fill: "#FFFFFF"; stroke: "#475569" } }
+P: "popup" { style: { fill: "#DBEAFE"; stroke: "#2563EB"; font-color: "#1E3A8A" } }
+A: "audio.ts" { style: { fill: "#DBEAFE"; stroke: "#2563EB"; font-color: "#1E3A8A" } }
+O: "orchestrator" { style: { fill: "#2563EB"; stroke: "#1E3A8A"; font-color: "#FFFFFF" } }
+T: "token.ts" { style: { fill: "#DBEAFE"; stroke: "#2563EB"; font-color: "#1E3A8A" } }
+X: "transport" { style: { fill: "#DBEAFE"; stroke: "#2563EB"; font-color: "#1E3A8A" } }
+C: "content\n(snapshot / executor)" { style: { fill: "#DBEAFE"; stroke: "#2563EB"; font-color: "#1E3A8A" } }
+B: "Backend\nsessionInit" { style: { fill: "#DCFCE7"; stroke: "#16A34A"; font-color: "#14532D" } }
+G: "Gemini Live" { style: { fill: "#F3F4F6"; stroke: "#6B7280"; font-color: "#374151" } }
+
+U -> P: "① speak"
+P -> A: "raw audio"
+A -> O: "② encoded frames"
+O -> T: "open session"
+T -> B: "③ signed install identity (ECDSA)"
+B -> O: "④ signed session config\nmodel · voice · guardrails · WS url"
+O -> X: "start session"
+X -> G: "⑤ WebSocket: bidi audio + tool turns"
+C -> O: "⑥ DOM snapshot"
+O -> G: "page context"
+G -> O: "⑦ tool call (click / fill / nav)"
+O -> C: "dispatch action"
+C -> O: "result"
+O -> G: "tool result"

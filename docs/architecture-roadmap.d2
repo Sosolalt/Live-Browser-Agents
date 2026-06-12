@@ -1,0 +1,62 @@
+# Agent layer (roadmap) — Live Nano Browser
+# Compile:  d2 --theme 0 docs/architecture-roadmap.d2 docs/architecture-roadmap.svg
+
+direction: down
+
+vars: {
+  d2-config: {
+    layout-engine: dagre
+    pad: 30
+  }
+}
+
+classes: {
+  road: { style: { fill: "#EDE9FE"; stroke: "#7C3AED"; font-color: "#5B21B6"; stroke-dash: 4; border-radius: 8 } }
+  roadhub: { style: { fill: "#7C3AED"; stroke: "#5B21B6"; font-color: "#FFFFFF"; bold: true; stroke-dash: 4; border-radius: 8 } }
+  store: { style: { fill: "#FEF3C7"; stroke: "#D97706"; font-color: "#78350F" } }
+}
+
+road: "Agent layer — Roadmap · LangGraph orchestration (backend, shared typed state)" {
+  class: road
+  style.font-size: 16
+  direction: down
+
+  planner: "Planner\n(supervisor)" { class: roadhub }
+
+  workers: "specialist agents" {
+    class: road
+    direction: right
+    perception: "Perception" { class: road }
+    researcher: "Researcher\n(RAG)" { class: road }
+    navigator: "Navigator" { class: road }
+    form: "Form" { class: road }
+    extractor: "Extractor" { class: road }
+  }
+
+  judges: "verify + guardrail  —  high-risk → quorum (Planner + Critic + Verifier)" {
+    class: road
+    direction: right
+    verifier: "Verifier" { class: road }
+    critic: "Critic / guardrail" { class: road }
+  }
+
+  memory: "Memory" { class: roadhub }
+
+  planner -> workers: "fan-out (Perception ‖ Researcher parallel)"
+  workers -> judges: "results"
+  judges.verifier -> planner: "verifier fail → replan" { style: { stroke: "#DC2626"; stroke-dash: 4; font-color: "#DC2626" } }
+  judges.critic -> planner: "critic reject → reroute" { style: { stroke: "#DC2626"; stroke-dash: 4; font-color: "#DC2626" } }
+  workers -> memory: "MemoryEvent" { style: { stroke: "#94A3B8"; stroke-dash: 2 } }
+  judges -> memory: "MemoryEvent" { style: { stroke: "#94A3B8"; stroke-dash: 2 } }
+}
+
+kg: "User Knowledge Graph" {
+  class: store
+  direction: right
+  pg: "Postgres\npgvector · Apache AGE · JSONB" { shape: cylinder; class: store }
+  redis: "Redis\nhot cache" { shape: cylinder; class: store }
+}
+
+road.workers.researcher -> kg.pg: "retriever (vector + k-hop graph)" { style.stroke: "#D97706" }
+road.memory -> kg.pg: "read / write" { style.stroke: "#D97706" }
+road.memory -> kg.redis: "cache" { style.stroke: "#D97706" }

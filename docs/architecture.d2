@@ -1,0 +1,82 @@
+# System architecture — Live Nano Browser
+# Compile:  d2 --theme 0 docs/architecture.d2 docs/architecture.svg
+
+direction: down
+
+vars: {
+  d2-config: {
+    layout-engine: dagre
+    pad: 30
+  }
+}
+
+classes: {
+  client: { style: { fill: "#DBEAFE"; stroke: "#2563EB"; font-color: "#1E3A8A"; border-radius: 8 } }
+  server: { style: { fill: "#DCFCE7"; stroke: "#16A34A"; font-color: "#14532D"; border-radius: 8 } }
+  external: { style: { fill: "#F3F4F6"; stroke: "#6B7280"; font-color: "#374151" } }
+  hub: { style: { fill: "#2563EB"; stroke: "#1E3A8A"; font-color: "#FFFFFF"; bold: true; border-radius: 8 } }
+}
+
+User: "User · voice" { shape: person; style: { fill: "#FFFFFF"; stroke: "#475569" } }
+
+ext: "Chrome MV3 Extension — TypeScript / Vite (no runtime deps)" {
+  class: client
+  style.font-size: 17
+
+  popup: "popup/" {
+    class: client
+    idx: "index.ts\nmic capture · UI · observability" { class: client }
+  }
+
+  content: "content/ (content script)" {
+    class: client
+    snap: "snapshot.ts\nDOM snapshot · redaction · scoring" { class: client }
+    exec: "index.ts\naction executor (click / fill / nav)" { class: client }
+  }
+
+  bg: "background/ (service worker)" {
+    class: client
+    router: "index.ts\nmessage router" { class: client }
+    orch: "orchestrator.ts\nlifecycle · dispatch queue" { class: hub }
+    transport: "transport.ts\nWebSocket · reconnect · replay" { class: client }
+    token: "token.ts\nECDSA keypair · installId" { class: client }
+    policy: "policy.ts\nguardrails · blocked domains" { class: client }
+    storage: "storage.ts\nresumption · replay buffer" { class: client }
+    audio: "audio.ts\nencode / normalise" { class: client }
+  }
+
+  shared: "shared/ — schema · contracts (Zod) · audioCodec" { class: client }
+}
+
+be: "Backend — Node 20 · Express · Zod" {
+  class: server
+  style.font-size: 17
+  session: "sessionInit.ts\nPOST /api/session-init · /api/install/register\nECDSA verify · nonce/replay · rate-limit · kill-switch" { class: server }
+  logger: "logger.ts\naudit log (hashed identity)" { class: server }
+}
+
+gemini: "Gemini Live API\nWebSocket bidi audio + function calling" {
+  shape: hexagon
+  class: external
+  style.font-size: 15
+}
+
+# ---- runtime data flow (solid, coloured by origin layer) ----
+User -> ext.popup.idx: "① voice" { style.stroke: "#2563EB" }
+ext.popup.idx -> ext.bg.audio: "② audio" { style.stroke: "#2563EB" }
+ext.bg.audio -> ext.bg.orch: "" { style.stroke: "#2563EB" }
+ext.bg.token -> be.session: "③ signed install id" { style.stroke: "#16A34A" }
+be.session -> ext.bg.orch: "④ signed session config" { style.stroke: "#16A34A" }
+ext.bg.orch -> ext.bg.transport: "" { style.stroke: "#2563EB" }
+ext.bg.transport <-> gemini: "⑤ bidi audio + tool turns" { style: { stroke: "#6B7280"; bold: true } }
+ext.content.snap -> ext.bg.router: "⑥ DOM snapshot" { style.stroke: "#2563EB" }
+ext.bg.router -> ext.bg.orch: "" { style.stroke: "#2563EB" }
+ext.bg.orch -> gemini: "context" { style: { stroke: "#6B7280"; stroke-dash: 3 } }
+gemini -> ext.bg.orch: "⑦ tool calls" { style: { stroke: "#6B7280"; stroke-dash: 3 } }
+ext.bg.orch -> ext.content.exec: "dispatch" { style.stroke: "#2563EB" }
+
+# ---- cross-cutting concerns (muted, dashed — recede behind runtime flow) ----
+ext.bg.orch -> ext.bg.token: "" { style: { stroke: "#94A3B8"; stroke-dash: 2 } }
+ext.bg.policy -> ext.bg.orch: "guards" { style: { stroke: "#94A3B8"; stroke-dash: 2 } }
+ext.bg.storage -> ext.bg.transport: "persists" { style: { stroke: "#94A3B8"; stroke-dash: 2 } }
+be.logger -> be.session: "audits" { style: { stroke: "#94A3B8"; stroke-dash: 2 } }
