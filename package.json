@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build -w @gemini-hackaton/orchestrator && npm run build -w @gemini-hackaton/backend && npm run build -w @gemini-hackaton/extension",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspaces",
     "typecheck": "npm run typecheck --workspaces"

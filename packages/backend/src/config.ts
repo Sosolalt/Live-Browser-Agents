@@ -15,6 +15,13 @@ export type AppConfig = {
   geminiLiveWebSocketUrl: string;
   policyVersion: string;
   guardrails: string[];
+  memoryEncryptionKey: string;
+  embeddingDimensions: number;
+  orchestratorMaxSteps: number;
+  orchestratorMaxToolCalls: number;
+  orchestratorMaxCostMicros: number;
+  blockedDomains: string[];
+  databaseUrl?: string;
 };
 
 const envSchema = z.object({
@@ -34,7 +41,17 @@ const envSchema = z.object({
   GEMINI_LIVE_VOICE: z.string().min(1).default("Aoede"),
   GEMINI_LIVE_WS_URL: z.string().default(""),
   POLICY_VERSION: z.string().min(1).default("v1"),
-  GUARDRAILS: z.string().default("safe-default")
+  GUARDRAILS: z.string().default("safe-default"),
+  // Master secret for AEAD field-level encryption of sensitive knowledge-graph
+  // payloads. Dev default MUST be replaced before any shared deployment.
+  MEMORY_ENCRYPTION_KEY: z.string().min(16).default("dev-memory-encryption-key-change-me"),
+  EMBED_DIMS: z.coerce.number().int().positive().default(64),
+  ORCH_MAX_STEPS: z.coerce.number().int().positive().default(12),
+  ORCH_MAX_TOOL_CALLS: z.coerce.number().int().positive().default(24),
+  ORCH_MAX_COST_MICROS: z.coerce.number().int().positive().default(5_000_000),
+  ORCH_BLOCKED_DOMAINS: z.string().default("accounts.google.com,login.microsoftonline.com,paypal.com"),
+  // Optional Postgres+pgvector store; falls back to in-memory when unset.
+  DATABASE_URL: z.string().optional()
 });
 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
@@ -59,6 +76,13 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => {
     geminiVoice: values.GEMINI_LIVE_VOICE,
     geminiLiveWebSocketUrl: values.GEMINI_LIVE_WS_URL,
     policyVersion: values.POLICY_VERSION,
-    guardrails: values.GUARDRAILS.split(",").map((item) => item.trim()).filter(Boolean)
+    guardrails: values.GUARDRAILS.split(",").map((item) => item.trim()).filter(Boolean),
+    memoryEncryptionKey: values.MEMORY_ENCRYPTION_KEY,
+    embeddingDimensions: values.EMBED_DIMS,
+    orchestratorMaxSteps: values.ORCH_MAX_STEPS,
+    orchestratorMaxToolCalls: values.ORCH_MAX_TOOL_CALLS,
+    orchestratorMaxCostMicros: values.ORCH_MAX_COST_MICROS,
+    blockedDomains: values.ORCH_BLOCKED_DOMAINS.split(",").map((item) => item.trim()).filter(Boolean),
+    ...(values.DATABASE_URL ? { databaseUrl: values.DATABASE_URL } : {})
   };
 };

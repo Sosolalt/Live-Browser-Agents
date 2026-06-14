@@ -3,9 +3,7 @@
   "compilerOptions": {
     "lib": ["ES2022"],
     "types": ["node"],
-    "paths": {
-      "@gemini-hackaton/orchestrator": ["../orchestrator/src/index.ts"]
-    }
+    "rootDir": "."
   },
   "include": ["src", "tests"]
 }

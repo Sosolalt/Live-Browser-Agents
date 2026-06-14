@@ -23,7 +23,13 @@ const baseConfig: AppConfig = {
   geminiVoice: "TestVoice",
   geminiLiveWebSocketUrl: "wss://example.test/live",
   policyVersion: "test-v1",
-  guardrails: ["test-safe"]
+  guardrails: ["test-safe"],
+  memoryEncryptionKey: "test-memory-encryption-key-0001",
+  embeddingDimensions: 64,
+  orchestratorMaxSteps: 12,
+  orchestratorMaxToolCalls: 24,
+  orchestratorMaxCostMicros: 5_000_000,
+  blockedDomains: ["paypal.com"]
 };
 
 const generateInstallKeypair = async (): Promise<{ privateKey: crypto.webcrypto.CryptoKey; publicKeyJwk: TestJwk }> => {

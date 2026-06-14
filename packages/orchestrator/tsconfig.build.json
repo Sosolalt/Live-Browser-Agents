@@ -4,9 +4,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "noEmit": false,
-    "declaration": false,
-    "sourceMap": false,
-    "paths": {}
+    "declaration": true,
+    "sourceMap": false
   },
   "include": ["src"],
   "exclude": ["tests", "**/*.test.ts"]

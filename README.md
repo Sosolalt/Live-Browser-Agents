@@ -18,9 +18,9 @@ Three views, generated from the D2 sources in [`docs/`](docs/). Recompile after 
 
 ![Runtime sequence](docs/architecture-runtime.svg)
 
-**Agent layer (roadmap)** — the backend LangGraph orchestration and the user knowledge graph store.
+**Agent layer** — the backend LangGraph orchestration and the user knowledge graph store. Implemented in [`packages/orchestrator`](packages/orchestrator) and wired into the backend; see [Autonomous orchestrator & knowledge graph](#autonomous-orchestrator--knowledge-graph-packagesorchestrator).
 
-![Agent layer (roadmap)](docs/architecture-roadmap.svg)
+![Agent layer](docs/architecture-roadmap.svg)
 
 ## Project goals
 
@@ -139,7 +139,37 @@ Single transactional store:
 ## Workspace layout
 
 - `packages/extension`: MV3 Chrome extension (background service worker, content script, popup)
-- `packages/backend`: Node.js TypeScript token service scaffold
+- `packages/backend`: Node.js TypeScript token service + orchestrator/memory HTTP surface
+- `packages/orchestrator`: backend-only LangGraph autonomous multi-agent orchestrator over the User Knowledge Graph
+
+## Autonomous orchestrator & knowledge graph (`packages/orchestrator`)
+
+A self-contained, backend-only package built on real `@langchain/langgraph` and `pg` + `pgvector`, behind clean ports so the deterministic defaults (used everywhere by default and in CI) can be swapped for production adapters with no graph changes.
+
+**Orchestration graph** (`src/graph`):
+- LangGraph `StateGraph` with a shared typed state, the supervisor pattern (Planner routes specialists), parallel Perception ‖ Researcher fan-out joined at the Planner, and conditional edges (verifier fail → replan, critic reject → reroute).
+- Nine agent nodes: Planner, Perception, Researcher, Navigator, Form, Extractor, Verifier, Critic, Memory.
+- Autonomous safety: Critic veto + blast-radius classification, **quorum** (Planner + Critic + Verifier) for high-risk actions, Verifier-driven rollback, hard per-session budgets (steps / tool calls / cost), and an anomaly detector that terminates + audits.
+- Per-session checkpointing (LangGraph `MemorySaver` by default; swap a durable saver) and a node-level event stream exposed as an SSE endpoint for observability (watch, never approve). The endpoint is live; the extension popup view that consumes it is not yet wired.
+- Ports: `ChatModel` (multi-model `pro`/`flash` routing + structured-output reflection retry), `ActionExecutor` (the `SimulatedActionExecutor` by default; production dispatches AgentActions to the extension), `Embedder`.
+
+**User Knowledge Graph** (`src/memory`):
+- Typed nodes/edges with a `GraphStore` port: `InMemoryGraphStore` (default/tests) and `PostgresGraphStore` (Postgres + `pgvector` + JSONB, row-level per-install tenancy).
+- Write path: normalize → dedupe by natural key → entity extraction + embedding → coreference (merge / `SIMILAR_TO`) → **PII gate** (redact credentials, AEAD-seal financial/gov-ID fields per-install, hash contacts, scrub embedded PII) → one atomic batch.
+- Hybrid retrieval: vector top-k seed → k-hop typed-edge expansion → importance × recency × path-weight re-rank → token-budgeted typed subgraph, with per-agent retrieval profiles and audited reads.
+- Consolidation jobs: episode compaction, entity resolution, concept formation, skill promotion, decay (cool → purge), contradiction resolution (`SUPERSEDES`).
+- Privacy surface: full export (optional unseal), cascading forget (node / edge / domain / time-range), pause-recording.
+
+### Backend endpoints
+
+All require the `Authorization: Bearer <session credential>` minted by `/api/session-init`; every endpoint is scoped to the token's `installId`.
+
+- `POST /api/orchestrate` — run the autonomous graph for an intent (`{ sessionId, intent, snapshot?, budget? }`); returns the run outcome + node events.
+- `GET  /api/orchestrate/:runId/events` — Server-Sent Events replay/stream of node-level events for a run.
+- `POST /api/memory/export` — full knowledge-graph export (`{ unseal? }`).
+- `POST /api/memory/forget` — cascading forget (`{ scope: { kind: node|edge|domain|timeRange, ... } }`).
+- `POST /api/memory/pause` — pause/resume recording (`{ paused }`).
+- `GET  /api/memory/graph` — read-only typed subgraph for the popup observability view.
 
 ## Prerequisites
 
@@ -193,6 +223,14 @@ pnpm -r typecheck
 - Set backend env vars in `packages/backend/.env` (see `.env.example`)
 - `SESSION_CREDENTIAL_SIGNING_SECRET` in `.env.example` is a dev placeholder; replace it before any shared deployment
 - `SESSION_MINTING_ENABLED=false` provides an emergency stop switch for session issuance
+
+Orchestrator + knowledge-graph backend env vars (all have safe local defaults; replace secrets before any shared deployment):
+
+- `MEMORY_ENCRYPTION_KEY` — master secret for AEAD field-level encryption of sensitive knowledge-graph payloads (per-install key derived via HKDF). **Replace the dev default before any shared deployment.**
+- `DATABASE_URL` — optional Postgres connection string; when set, the knowledge graph uses Postgres + `pgvector`, otherwise an in-memory store.
+- `EMBED_DIMS` — embedding vector dimension (must match the Postgres `vector(N)` column; default `64`).
+- `ORCH_MAX_STEPS` / `ORCH_MAX_TOOL_CALLS` / `ORCH_MAX_COST_MICROS` — hard per-session orchestration budgets.
+- `ORCH_BLOCKED_DOMAINS` — comma-separated domains the Critic hard-vetoes.
 
 ## Operations
 
